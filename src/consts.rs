@@ -1,0 +1,11 @@
+pub const WIDTH: i32 = 900;
+pub const HEIGHT: i32 = 700;
+pub const IM_WIDTH: i32 = 700;
+pub const IM_HEIGHT: i32 = 500;
+pub const IM_WIDTH_PREV: i32 = 180;
+pub const IM_HEIGHT_PREV: i32 = 180;
+pub const BUTTON_WIDTH: i32 = 90;
+pub const BUTON_HEIGHT: i32 = 30;
+pub const BUTON_SPACING: i32 = 10;
+pub const BORDER: i32 = 10;
+pub const CONFIG_FILE:&str = "config.toml";
