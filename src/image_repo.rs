@@ -2,21 +2,22 @@ use fltk::image::PngImage;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::path::Path;
-
+use log::info;
 use crate::usg_image::*;
 
 #[derive(Clone, Debug)]
-pub struct ImageViewer {
+pub struct ImageRepo {
     pub current_pos: Rc<RefCell<usize>>,
     pub current_img:Rc<RefCell<Option<PngImage>>>,
     pub images: Rc<RefCell<Vec<USGImage>>>,
 }
 
-impl ImageViewer {
+impl ImageRepo {
     
     pub fn load_images(&mut self, _paths:  Vec<String>) {
 
         let mut tmp: Vec<USGImage> = Vec::new();
+  
 
         for p in _paths
         {
@@ -24,6 +25,8 @@ impl ImageViewer {
             a.add_image(p);
             tmp.push(a);
         }
+
+        info!("loaded {} images", tmp.len());  
         *self.images.borrow_mut() = tmp;   
 
     }

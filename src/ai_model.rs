@@ -5,24 +5,24 @@ use crate::consts::*;
 
 #[derive(Debug, Clone)]
 pub struct AIModel {
-    pub model_path: String,
-    pub model_name: String,
-    pub model_desc: String,
+    pub model_path: Option<String>,
+    pub model_name: Option<String>,
+    pub model_desc: Option<String>,
 
 }
 
 impl AIModel {
 
     pub fn load_model(&mut self, _model_path:  String, _model_name: String, _model_desc: String) {
-        self.model_desc = _model_desc;
-        self.model_name = _model_name;
-        self.model_path = _model_path;
+        self.model_desc = Some(_model_desc);
+        self.model_name = Some(_model_name);
+        self.model_path = Some(_model_path);
     }
 
     pub fn print_model_info(&mut self){
 
         let mut graph = Graph::new();
-        let bundle = SavedModelBundle::load(&SessionOptions::new(), &["serve"], &mut graph, self.model_path.clone()).unwrap();
+        let bundle = SavedModelBundle::load(&SessionOptions::new(), &["serve"], &mut graph, self.model_path.clone().unwrap()).unwrap();
 
         let signature = bundle
             .meta_graph_def()
@@ -56,7 +56,7 @@ impl AIModel {
         let input_tensor = tensor;
         let mut graph = Graph::new();
 
-        let bundle = SavedModelBundle::load(&SessionOptions::new(), &["serve"], &mut graph, self.model_path.clone()).unwrap();
+        let bundle = SavedModelBundle::load(&SessionOptions::new(), &["serve"], &mut graph, self.model_path.clone().unwrap()).unwrap();
 
         
         let session = &bundle.session;
@@ -90,9 +90,9 @@ impl AIModel {
 
         // Run model
         session.run(&mut args).expect("Error occurred during calculations");
-        info!("run model OK...");
+      
         let out_res1: f32 = args.fetch(out).unwrap()[0];
-        info!("Results: {:?}", out_res1);
+        info!("prediction results: {:?}", out_res1);
         
         return out_res1;
 

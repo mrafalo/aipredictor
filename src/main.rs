@@ -9,11 +9,10 @@ use walkdir::WalkDir;
 use std::path::Path;
 use image::imageops;
 use log::info;
-use chrono::{DateTime, Utc};
 
-use models::*;
+use models::{ai_model::AIModel, *};
 use crate::consts::*;
-use crate::image_viewer::ImageViewer;
+use crate::image_repo::ImageRepo;
 use crate::usg_image::*;
 use crate::ai_model_repo::AIModelRepo;
 
@@ -31,7 +30,7 @@ fn frame2_redraw(_img: Option<image::RgbaImage>, _surf:Rc<RefCell<ImageSurface>>
 
         img.draw(0, 0, f.w(), f.h());
 
-        info!("f2 new width: {}, height: {}", img.width(), img.height() );
+        info!("resized image | width: {}, height: {}", img.width(), img.height() );
     }
 
     ImageSurface::pop_current();
@@ -39,7 +38,7 @@ fn frame2_redraw(_img: Option<image::RgbaImage>, _surf:Rc<RefCell<ImageSurface>>
 }
 
 
-fn frame1_redraw(_annotator: ImageViewer, _surf:Rc<RefCell<ImageSurface>>, _frame: Frame){
+fn frame1_redraw(_annotator: ImageRepo, _surf:Rc<RefCell<ImageSurface>>, _frame: Frame){
 
     let mut annotator_clone = _annotator.clone();
     let mut f = _frame.clone();
@@ -86,7 +85,12 @@ fn main() {
     let status_disp = output::Output::default().with_pos(0, IM_HEIGHT).with_size(IM_WIDTH - 100, 30);
     let mut position_disp = output::Output::default().with_pos(IM_WIDTH-100, IM_HEIGHT).with_size(100, 30);
  
-    let mut models_repo: AIModelRepo = AIModelRepo{models: None, model_results: None};
+
+    //let tmp_model = AIModel { model_path: None, model_name: None, model_desc: None };
+    let tmp_models: Vec<AIModel> = Vec::new();
+    //tmp_models.push(tmp_model);
+    let tmp_results: Vec<f32> = Vec::new();
+    let models_repo: AIModelRepo = AIModelRepo{models: Rc::from(RefCell::from(tmp_models)), model_results: Rc::from(RefCell::from(tmp_results))};
 
     //models.load_models();
     frame1.set_color(Color::Red);
@@ -98,7 +102,7 @@ fn main() {
     let mut imgs: Vec<USGImage> = Vec::new();
     imgs.push(im);
     let imgs2 = Rc::from(RefCell::from(imgs));
-    let annotator: ImageViewer = ImageViewer { current_pos: Rc::from(RefCell::from(0)), current_img: Rc::from(RefCell::from(None)), images: imgs2};
+    let annotator: ImageRepo = ImageRepo { current_pos: Rc::from(RefCell::from(0)), current_img: Rc::from(RefCell::from(None)), images: imgs2};
 
     let mut image_paths = Vec::new();
 
@@ -131,8 +135,7 @@ fn main() {
     frame1.draw({
         let surf = surf1.clone();
         move |f| {
-            //println!("f1 draw x: {}, y: {},  h: {}, w: {}",f.x(), f.y(), f.w(), f.h());
-
+      
             let surf = surf.borrow();
             let mut img = surf.image().unwrap();
             img.draw(f.x(), f.y(), f.w(), f.h());
@@ -236,11 +239,8 @@ fn main() {
         let mut but_next_clone = but_next.clone();
        
         move |_| {
-
             let new_folder_path = FileDialog::new().set_directory(".").pick_folder();
-
             if !new_folder_path.is_none(){
-
                 let source_path = new_folder_path.unwrap();
                 image_paths.clear();
 
@@ -250,17 +250,14 @@ fn main() {
                     let file_path_clone = file_path.clone();
 
                     if file_path_clone.to_lowercase().ends_with(".png") {
-
                         image_paths.push(file_path_clone);
                         
                     }
                 }
                 annotator_clone.load_images(image_paths.clone());
-
-               
                 annotator_clone.reset_pos();
                 annotator_clone.update_current_img();
-                
+    
                 but_next_clone.do_callback();
             }
             
@@ -297,16 +294,11 @@ fn main() {
             if !annotator_clone.is_empty() {
                 annotator_clone.decrement_pos();
                 frame1_redraw(annotator_clone.clone(), surf.clone(), f.clone());
-
                 let txt = format!("{}", annotator_clone.get_current_img_info_text());
                 status_disp.set_value(&txt);
-
             }
-
         }
-        
     });
-
 
     but_exit.set_callback({
 
@@ -318,15 +310,15 @@ fn main() {
     });
 
     but_load_models.set_callback({
-        let mut models_repo = models_repo.clone();
-        
+        let mut models_repo_clone = models_repo.clone();
+
         move |_| {
 
             let new_folder_path = FileDialog::new().set_directory(".").pick_folder();
 
             if !new_folder_path.is_none(){
                 let source_path = new_folder_path.unwrap();
-                models_repo.load_models(source_path.to_str().unwrap());
+                models_repo_clone.load_models(source_path.to_str().unwrap());
             }
 
         }
@@ -335,51 +327,19 @@ fn main() {
     but_detect.set_callback({
 
         let mut bottom_terminal = bottom_terminal.clone();
-        let mut models_repo = models_repo.clone();
-        //let models = models_repo.clone().models.unwrap();
-        
+        let mut models_repo_clone = models_repo.clone();
+        let mut annotator_clone = annotator.clone();
 
         move |_| {
-            //let models = models.clone().unwrap();   
-            println!("good???");
-
-            //let models = models_repo.clone().models;
-            let mut txt;
-            if !(models_repo.is_empty()) {
-                println!("good");
-
-                let models = models_repo.clone().models.unwrap();   
-                for mut m in models.clone().into_iter(){
-
-                    let resm = m.predict("tmp.png");
-                    let resm = format!("{:.1$}", resm, 2);                
-                    let now: DateTime<Utc> = Utc::now();
-                    txt = now.format("%Y-%m-%d %T").to_string() + "|" + m.model_name.as_str() + ": " + resm.as_str() + "\n";
-                    bottom_terminal.append(&txt);
-
-                }
+            if !(models_repo_clone.is_empty()) & !(annotator_clone.is_empty()){
+                let txt = models_repo_clone.predict_multi_models();
+                bottom_terminal.append(&txt)
             }
 
-            //let mut txt;
-            // let cnt = &models_repo.get_models_count();
-            // if cnt > &0 {
-            //     for mut m in models.clone().into_iter(){
-
-            //         let resm = m.predict("tmp.png");
-            //         let resm = format!("{:.1$}", resm, 2);                
-            //         let now: DateTime<Utc> = Utc::now();
-            //         txt = now.format("%Y-%m-%d %T").to_string() + "|" + m.model_name.as_str() + ": " + resm.as_str() + "\n";
-            //         bottom_terminal.append(&txt);
-
-            //     }
-            // }
 
         }
-        
-
     });
- 
-   
+
     app.run().unwrap();
 
 }
